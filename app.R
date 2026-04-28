@@ -21,8 +21,7 @@ df_raw$Diabetes_Label <- factor(
   labels = c("Sin Diabetes", "Prediabetes", "Diabetes")
 )
 
-# Paleta cualitativa accesible — ColorBrewer Set1
-# Elegida porque las tres categorías NO tienen orden jerárquico
+# Paleta cualitativa accesible — igual que D3.js
 PAL <- c("Sin Diabetes" = "#4DAF4A",
          "Prediabetes"  = "#FF7F00",
          "Diabetes"     = "#E41A1C")
@@ -58,24 +57,24 @@ ui <- fluidPage(
       padding: 16px;
     }
     .panel-control h5 {
-      font-size: 13px;
+      font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: #495057;
+      letter-spacing: 0.8px;
+      color: #718096;
       margin-bottom: 14px;
     }
 
     .insight {
-      background: #fff8e1;
-      border-left: 4px solid #f9a825;
+      background: #fffbeb;
+      border-left: 4px solid #f6ad55;
       padding: 9px 13px;
       margin-bottom: 14px;
       font-size: 13px;
       color: #3d3d3d;
       border-radius: 0 4px 4px 0;
     }
-    .insight strong { color: #e65100; }
+    .insight strong { color: #c05621; }
 
     .nav-tabs > li > a {
       font-size: 13px;
@@ -115,23 +114,8 @@ ui <- fluidPage(
                
                hr(style = "margin: 12px 0;"),
                
-               sliderInput(
-                 "bmi_rango", "Rango de BMI:",
-                 min = 10, max = 98, value = c(10, 60), step = 1
-               ),
-               
-               hr(style = "margin: 12px 0;"),
-               
-               sliderInput(
-                 "n_muestra", "Muestra - Scatter (n):",
-                 min = 1000, max = 8000, value = 3000, step = 500
-               ),
-               
-               hr(style = "margin: 12px 0;"),
-               
                p(style = "font-size:11px; color:#868e96; margin:0;",
-                 "Los filtros de condicion y BMI se aplican a todos los graficos.
-           El slider de muestra aplica solo al scatter plot.")
+                 "Los filtros aplican a todas las visualizaciones excepto el mapa de correlaciones.")
            )
     ),
     
@@ -144,7 +128,7 @@ ui <- fluidPage(
                       br(),
                       div(class = "insight",
                           strong("Hallazgo:"),
-                          " El 84.5% de los encuestados no tiene diabetes. La prediabetes
+                          " El 84.2% de los encuestados no tiene diabetes. La prediabetes
              esta muy subrepresentada (1.8%), lo que puede reflejar
              subdiagnostico en la poblacion general."
                       ),
@@ -165,16 +149,16 @@ ui <- fluidPage(
                       p(class = "fuente", "Fuente: CDC BRFSS 2015 — Kaggle")
              ),
              
-             # Viz 3 — Scatter: Relacion BMI vs Salud General
-             tabPanel("BMI vs Salud percibida",
+             # Viz 3 — Barras agrupadas: Factores de riesgo
+             tabPanel("Factores de riesgo",
                       br(),
                       div(class = "insight",
                           strong("Hallazgo:"),
-                          " Existe una relacion positiva entre mayor BMI y peor salud
-             general percibida en los tres grupos. Los casos de diabetes
-             se concentran en la zona de mayor BMI y peor salud."
+                          " La hipertension (75.3%) y el colesterol alto (67%) son los factores
+             mas prevalentes en personas con diabetes. La actividad fisica es
+             notablemente menor en ese grupo."
                       ),
-                      plotOutput("viz_scatter", height = "420px"),
+                      plotOutput("viz_factores", height = "420px"),
                       p(class = "fuente", "Fuente: CDC BRFSS 2015 — Kaggle")
              ),
              
@@ -184,8 +168,8 @@ ui <- fluidPage(
                       div(class = "insight",
                           strong("Hallazgo:"),
                           " La proporcion de personas con diabetes crece sostenidamente
-             con la edad. A partir del grupo 60-64 anos, los casos de
-             diabetes superan el 25% de los encuestados."
+             con la edad. A partir del grupo 60-64 anos, los casos superan
+             el 25% de los encuestados."
                       ),
                       plotOutput("viz_edad", height = "420px"),
                       p(class = "fuente", "Fuente: CDC BRFSS 2015 — Kaggle")
@@ -196,9 +180,9 @@ ui <- fluidPage(
                       br(),
                       div(class = "insight",
                           strong("Hallazgo:"),
-                          " Diabetes correlaciona principalmente con hipertension (0.30),
-             salud general percibida (0.33) y BMI (0.22). La actividad
-             fisica muestra correlacion negativa consistente con la condicion."
+                          " Diabetes correlaciona principalmente con hipertension (0.27),
+             salud general percibida (0.30) y BMI (0.22). La actividad
+             fisica muestra correlacion negativa consistente."
                       ),
                       plotOutput("viz_heatmap", height = "480px"),
                       p(class = "fuente", "Fuente: CDC BRFSS 2015 — Kaggle")
@@ -215,11 +199,7 @@ server <- function(input, output, session) {
   # Dataset filtrado reactivo
   df <- reactive({
     df_raw %>%
-      filter(
-        Diabetes_Label %in% input$sel_grupo,
-        BMI >= input$bmi_rango[1],
-        BMI <= input$bmi_rango[2]
-      )
+      filter(Diabetes_Label %in% input$sel_grupo)
   })
   
   # ── Viz 1: Barras comparativas ────────────────────────────
@@ -236,15 +216,11 @@ server <- function(input, output, session) {
       geom_text(aes(label = label), vjust = -0.35, size = 3.8, lineheight = 1.3,
                 fontface = "bold", color = "#2d2d2d") +
       scale_fill_manual(values = PAL) +
-      scale_y_continuous(
-        labels = comma,
-        expand = expansion(mult = c(0, 0.18))
-      ) +
+      scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.18))) +
       labs(
         title    = "Distribucion de encuestados segun condicion diabetica",
         subtitle = "La mayoria de encuestados no reporta diabetes; la prediabetes aparece subrepresentada",
-        x = NULL,
-        y = "Numero de personas"
+        x = NULL, y = "Numero de personas"
       ) +
       theme_minimal(base_size = 13) +
       theme(
@@ -262,23 +238,17 @@ server <- function(input, output, session) {
   output$viz_boxplot <- renderPlot({
     ggplot(df(), aes(x = Diabetes_Label, y = BMI, fill = Diabetes_Label)) +
       geom_boxplot(
-        outlier.shape = 16,
-        outlier.alpha = 0.08,
-        outlier.size  = 0.6,
-        width         = 0.45,
-        show.legend   = FALSE
+        outlier.shape = 16, outlier.alpha = 0.08,
+        outlier.size  = 0.6, width = 0.45, show.legend = FALSE
       ) +
-      stat_summary(
-        fun = mean, geom = "point",
-        shape = 23, size = 3.5, fill = "white", color = "#2d2d2d"
-      ) +
+      stat_summary(fun = mean, geom = "point",
+                   shape = 23, size = 3.5, fill = "white", color = "#2d2d2d") +
       scale_fill_manual(values = PAL) +
       scale_y_continuous(limits = c(10, 70), breaks = seq(10, 70, 10)) +
       labs(
         title    = "Distribucion del IMC (BMI) segun condicion diabetica",
         subtitle = "El rombo blanco indica la media. Las cajas muestran el rango intercuartilico (Q1-Q3).",
-        x = NULL,
-        y = "Indice de Masa Corporal (BMI)"
+        x = NULL, y = "Indice de Masa Corporal (BMI)"
       ) +
       theme_minimal(base_size = 13) +
       theme(
@@ -291,47 +261,46 @@ server <- function(input, output, session) {
       )
   })
   
-  # ── Viz 3: Scatter BMI vs GenHlth ────────────────────────
-  output$viz_scatter <- renderPlot({
-    set.seed(42)
-    n_max  <- min(input$n_muestra, nrow(df()))
-    muestra <- df() %>% slice_sample(n = n_max)
+  # ── Viz 3: Barras agrupadas factores de riesgo ────────────
+  output$viz_factores <- renderPlot({
+    factores    <- c("HighBP","HighChol","Smoker","PhysActivity","HeartDiseaseorAttack")
+    etiquetas   <- c("Hipertension","Col. alto","Fumador","Act. fisica","Enf. cardiaca")
     
-    etiq_salud <- c("1" = "Excelente", "2" = "Muy buena",
-                    "3" = "Buena",     "4" = "Regular",   "5" = "Mala")
+    datos_long <- df() %>%
+      group_by(Diabetes_Label) %>%
+      summarise(across(all_of(factores), mean), .groups = "drop") %>%
+      pivot_longer(cols = all_of(factores),
+                   names_to = "Factor", values_to = "Proporcion") %>%
+      mutate(Factor = factor(Factor, levels = factores, labels = etiquetas))
     
-    ggplot(muestra, aes(x = BMI, y = GenHlth, color = Diabetes_Label)) +
-      geom_jitter(alpha = 0.25, size = 1.4, height = 0.3, width = 0) +
-      geom_smooth(method = "lm", se = TRUE, linewidth = 1.1,
-                  alpha = 0.12, show.legend = FALSE) +
-      scale_color_manual(values = PAL, name = "Condicion") +
-      scale_y_continuous(
-        breaks = 1:5,
-        labels = etiq_salud,
-        limits = c(0.5, 5.5)
-      ) +
-      scale_x_continuous(limits = c(10, 70), breaks = seq(10, 70, 10)) +
+    ggplot(datos_long, aes(x = Factor, y = Proporcion, fill = Diabetes_Label)) +
+      geom_col(position = "dodge", width = 0.7) +
+      geom_text(aes(label = percent(Proporcion, accuracy = 1)),
+                position = position_dodge(width = 0.7),
+                vjust = -0.4, size = 3.2, fontface = "bold") +
+      scale_fill_manual(values = PAL, name = "Condicion") +
+      scale_y_continuous(labels = percent, limits = c(0, 1),
+                         expand = expansion(mult = c(0, 0.1))) +
       labs(
-        title    = "Relacion entre IMC y salud general percibida",
-        subtitle = paste0("Muestra aleatoria de ", format(n_max, big.mark = ","),
-                          " registros. Las bandas muestran intervalo de confianza al 95%."),
-        x = "Indice de Masa Corporal (BMI)",
-        y = "Salud general autopercibida"
+        title    = "Prevalencia de factores de riesgo por condicion diabetica",
+        subtitle = "Porcentaje de personas con cada factor de riesgo presente",
+        x = NULL, y = "Proporcion"
       ) +
-      theme_minimal(base_size = 13) +
+      theme_minimal(base_size = 12) +
       theme(
-        plot.title      = element_text(face = "bold", size = 14, color = "#1a1a2e"),
-        plot.subtitle   = element_text(size = 11, color = "#6c757d", margin = margin(b = 12)),
-        legend.position = "top",
-        legend.title    = element_text(face = "bold", size = 11),
-        panel.grid.minor = element_blank(),
-        plot.margin     = margin(10, 20, 10, 10)
+        plot.title         = element_text(face = "bold", size = 14, color = "#1a1a2e"),
+        plot.subtitle      = element_text(size = 11, color = "#6c757d", margin = margin(b = 12)),
+        legend.position    = "top",
+        legend.title       = element_text(face = "bold", size = 11),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor   = element_blank(),
+        axis.text.x        = element_text(angle = 20, hjust = 1),
+        plot.margin        = margin(10, 20, 10, 10)
       )
   })
   
-  # ── Viz 4: Barras apiladas por grupo de edad ──────────────
+  # ── Viz 4: Barras apiladas por edad ──────────────────────
   output$viz_edad <- renderPlot({
-    
     etiq_edad <- c(
       "1"="18-24","2"="25-29","3"="30-34","4"="35-39",
       "5"="40-44","6"="45-49","7"="50-54","8"="55-59",
@@ -349,15 +318,12 @@ server <- function(input, output, session) {
     ggplot(datos_edad, aes(x = GrupoEdad, y = pct, fill = Diabetes_Label)) +
       geom_col(width = 0.75, position = "stack") +
       scale_fill_manual(values = PAL, name = "Condicion") +
-      scale_y_continuous(
-        labels = percent_format(accuracy = 1),
-        expand = expansion(mult = c(0, 0.02))
-      ) +
+      scale_y_continuous(labels = percent_format(accuracy = 1),
+                         expand = expansion(mult = c(0, 0.02))) +
       labs(
         title    = "Composicion de la condicion diabetica segun grupo de edad",
-        subtitle = "Barras apiladas al 100% — La prevalencia de diabetes aumenta sostenidamente con la edad",
-        x = "Grupo de edad (anos)",
-        y = "Proporcion de encuestados"
+        subtitle = "Barras apiladas al 100% — La prevalencia de diabetes aumenta con la edad",
+        x = "Grupo de edad (anos)", y = "Proporcion de encuestados"
       ) +
       theme_minimal(base_size = 13) +
       theme(
@@ -372,18 +338,14 @@ server <- function(input, output, session) {
       )
   })
   
-  # ── Viz 5: Heatmap de correlaciones ──────────────────────
+  # ── Viz 5: Heatmap correlaciones ──────────────────────────
   output$viz_heatmap <- renderPlot({
-    
     vars <- c("Diabetes_012","HighBP","HighChol","BMI",
-              "Smoker","PhysActivity","Fruits","Veggies",
-              "GenHlth","MentHlth","PhysHlth","Age","Income")
-    
+              "Smoker","PhysActivity","GenHlth","Age","Income")
     labs_vars <- c("Diabetes","Hipertension","Col. alto","BMI",
-                   "Fumador","Act. fisica","Frutas","Verduras",
-                   "Salud gral.","Salud mental","Salud fisica","Edad","Ingreso")
+                   "Fumador","Act. fisica","Salud gral.","Edad","Ingreso")
     
-    mat <- df() %>%
+    mat <- df_raw %>%
       select(all_of(vars)) %>%
       cor(use = "complete.obs")
     
@@ -391,22 +353,18 @@ server <- function(input, output, session) {
     rownames(mat) <- labs_vars
     
     mat_long <- melt(mat)
-    mat_long$txt_color <- ifelse(abs(mat_long$value) > 0.35, "white", "#2d2d2d")
+    mat_long$txt_color <- ifelse(abs(mat_long$value) > 0.25, "white", "#2d2d2d")
     
     ggplot(mat_long, aes(x = Var1, y = Var2, fill = value)) +
       geom_tile(color = "white", linewidth = 0.6) +
       geom_text(aes(label = sprintf("%.2f", value), color = txt_color),
                 size = 3.0, fontface = "bold") +
       scale_color_identity() +
-      # Paleta divergente correcta para correlaciones (punto medio en 0)
       scale_fill_gradient2(
-        low      = "#2166AC",
-        mid      = "#f7f7f7",
-        high     = "#D6604D",
-        midpoint = 0,
-        limits   = c(-1, 1),
-        name     = "Pearson r",
-        guide    = guide_colorbar(barheight = 10, barwidth = 1.2)
+        low = "#2166AC", mid = "#f7f7f7", high = "#D6604D",
+        midpoint = 0, limits = c(-1, 1),
+        name = "Pearson r",
+        guide = guide_colorbar(barheight = 10, barwidth = 1.2)
       ) +
       labs(
         title    = "Matriz de correlacion de Pearson entre indicadores de salud",
@@ -425,7 +383,6 @@ server <- function(input, output, session) {
         plot.margin   = margin(10, 20, 10, 10)
       )
   })
-  
 }
 
 # ── Lanzar ───────────────────────────────────────────────────
